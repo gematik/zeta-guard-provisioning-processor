@@ -1,0 +1,6 @@
+@Library('gematik-jenkins-shared-library') _
+pipelineGitHubPublishSources {
+    GITHUB_PROJECT_NAME = 'zeta-guard-provisioning-processor'
+    GEMATIK_PROJECT_NAME = '/zeta/zeta-guard/provisioning-processor'
+    GITLAB_MAIN_BRANCH = 'gematik/release'
+}
