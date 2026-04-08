@@ -1,0 +1,24 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://openvex.dev/docs/public/vex-c07ec5eec3b34a99ca3dc90811f5678920a6a1a53c697962862171bb33d03bdc",
+  "author": "Unknown Author",
+  "version": 2,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2026-22184"
+      },
+      "products": [
+        {
+          "@id": "pkg:apk/alpine/zlib"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "False positive. Ist in 1.3.1-r2 gefixt. Siehe https://security.alpinelinux.org/vuln/CVE-2026-22184.",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "timestamp": "2026-03-25T09:34:49.888954597Z"
+    }
+  ],
+  "timestamp": "2026-03-25T09:26:40Z",
+  "last_updated": "2026-03-25T09:34:49Z"
+}

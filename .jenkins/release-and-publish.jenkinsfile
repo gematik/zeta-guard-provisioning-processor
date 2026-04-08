@@ -1,0 +1,98 @@
+@Library('gematik-jenkins-shared-library') _
+
+String GIT_URL = 'https://gitlab.prod.ccs.gematik.solutions/zeta/zeta-guard/provisioning-processor.git'
+String GITLAB_RELEASE_TAG = ''
+String GITHUB_PROJECT = "zeta-guard-provisioning-processor"
+String DOCKER_IMAGE_NAME = 'provisioning-processor'
+
+properties([
+        parameters([
+                // Dynamic Choice Parameter for Release Tags
+                [
+                        $class    : 'ChoiceParameter',
+                        choiceType: 'PT_SINGLE_SELECT',
+                        name      : 'RELEASE_VERSION',
+                        script    : [
+                                $class        : 'GroovyScript',
+                                fallbackScript: [
+                                        sandbox: true,
+                                        script : 'return ["ERROR"]'
+                                ],
+                                script        : [
+                                        sandbox: true,
+                                        script : """
+                                return "git ls-remote --tags ${GIT_URL}".execute().text.readLines().collect {
+                                        it.split()[1].replaceAll("refs/tags/", "")
+                                    }.findAll {
+                                        it ==~ /\\d+.\\d+.\\d+/
+                                    }.sort().reverse()
+                    """
+                                ]
+                        ]
+                ]
+        ])
+])
+
+pipeline {
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')
+  }
+  agent { label 'k8-backend-small' }
+
+  stages {
+    stage('Initialize') {
+      steps {
+        script {
+          GITLAB_RELEASE_TAG = "${RELEASE_VERSION}-github"
+        }
+      }
+    }
+
+    stage('Push Docker Image to Prod Registry') {
+      steps {
+        build job: 'ZETA-devops-Publish_Docker_Image',
+                parameters: [
+                        string(name: 'IMAGE_NAME', value: String.valueOf("${DOCKER_IMAGE_NAME}")),
+                        text(name: 'IMAGE_VERSION', value: String.valueOf("${RELEASE_VERSION}")),
+                        booleanParam(name: 'IS_LATEST', value: true)
+                ]
+      }
+    }
+
+    stage('Tag GitLab Release') {
+      steps {
+        script {
+          sh "git tag ${GITLAB_RELEASE_TAG}"
+          sh "git push origin ${GITLAB_RELEASE_TAG}"
+        }
+      }
+    }
+
+    stage('Publish GitHub Sources') {
+      steps {
+        build job: 'ZETA-zeta_guard_provisioning_processor-GitHub_Release',
+                parameters: [
+                        string(name: 'GITLAB_TAG', value: String.valueOf("${GITLAB_RELEASE_TAG}")),
+                        text(name: 'COMMIT_MESSAGE', value: String.valueOf("Release ${RELEASE_VERSION}")),
+                        text(name: 'REMOTE_BRANCH', value: String.valueOf("main")),
+                        string(name: 'AUTOMATIC_MERGE', value: String.valueOf("YES")),
+                        string(name: 'GITHUB_TAG', value: String.valueOf("${RELEASE_VERSION}"))
+                ]
+      }
+    }
+
+    stage('Create GitHub-Release') {
+      steps {
+        gitHubCreateRelease(
+                GITHUB_PROJECT,
+                RELEASE_VERSION,
+                "Release ${RELEASE_VERSION}", // Title
+                "Siehe [Release Notes](https://github.com/gematik/${GITHUB_PROJECT}/blob/main/ReleaseNotes.md)", // Description
+                false, // Pre-Release
+                false // Draft (non-public)
+        )
+      }
+    }
+  }
+}
