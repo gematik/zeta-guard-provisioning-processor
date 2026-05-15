@@ -2,6 +2,12 @@
 
 # ZETA Guard Provisioning Processor
 
+## Release 1.0.0
+
+### added:
+- processing of `roots.json`
+- option to provide the CA of the registry from which the provisioning container is fetched (for TLS) via `PROVISIONING_CONTAINER_REGISTRY_CA_FILE`
+
 ## Release 0.5.0
 
 ### added:

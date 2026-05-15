@@ -93,4 +93,18 @@ echo "............................"
 echo "end of policy-signer transformer"
 echo "............................"
 
+
+echo "============================"
+echo "start of roots-json transformer"
+echo "============================"
+if [ "$PROCESSORS_ROOTS_JSON_ENABLED" = "true" ]
+then
+  "$PROCESSORS_PATH"/roots-json/transform.sh
+else
+  echo "roots-json transformer is disabled. If you need it, enable it via PROCESSORS_ROOTS_JSON_ENABLED=true"
+fi
+echo "............................"
+echo "end of roots-json transformer"
+echo "............................"
+
 rm -rf "$PROVISIONING_FILES_ROOT"
