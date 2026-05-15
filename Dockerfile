@@ -12,6 +12,8 @@ ENV TOOLS_PATH=/opt/provisioning-tools
 ENV PROCESSORS_PATH="$TOOLS_PATH/processors"
 ADD src $TOOLS_PATH
 
+RUN apk update && apk upgrade
+
 USER 1000
 
 ENTRYPOINT [ "/opt/provisioning-tools/process-provisioned-files.sh" ]

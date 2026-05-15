@@ -42,11 +42,23 @@ else
   echo "Using TRUST_CERTCHAIN_FILE as defined: $TRUST_CERTCHAIN_FILE"
 fi
 
+if [ -n "$PROVISIONING_CONTAINER_REGISTRY_CA_FILE" ]
+then
+  echo "Using PROVISIONING_CONTAINER_REGISTRY_CA_FILE as defined: $PROVISIONING_CONTAINER_REGISTRY_CA_FILE"
+  export REGISTRY_CA_FILE="$PROVISIONING_CONTAINER_REGISTRY_CA_FILE"
+else
+  echo "PROVISIONING_CONTAINER_REGISTRY_CA_FILE not defined. Using container defaults."
+  export REGISTRY_CA_FILE=""
+fi
+
 CONTAINER_DOWNLOAD_DIR=$(mktemp -d)
 mkdir -p "$PROVISIONING_FILES_ROOT"
 
 echo "Downloading image: $PROVISIONING_CONTAINER_NAME"
-cosign save --dir "$CONTAINER_DOWNLOAD_DIR" "$PROVISIONING_CONTAINER_NAME"
+cosign save \
+    --registry-cacert="$REGISTRY_CA_FILE" \
+    --dir "$CONTAINER_DOWNLOAD_DIR" \
+    "$PROVISIONING_CONTAINER_NAME"
 
 echo "Verifying image signature"
 cosign verify \
