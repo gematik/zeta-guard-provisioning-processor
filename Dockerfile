@@ -1,12 +1,16 @@
-FROM docker.io/alpine:3.23.3
+ARG DOCKER_HUB="docker.io"
+
+FROM ${DOCKER_HUB}/alpine:3.23.3
 
 RUN apk add \
     bash \
     cabextract \
     cosign \
     jq \
+    kubectl \
     libxslt \
-    openssl
+    openssl \
+    tzdata
 
 ENV TOOLS_PATH=/opt/provisioning-tools
 ENV PROCESSORS_PATH="$TOOLS_PATH/processors"

@@ -26,12 +26,15 @@
 #
 
 RESULT_FILE="$RESULT_DIR/roots.json"
+TMP_RESULT_FILE="$RESULT_DIR/.roots.json.tmp.$$"
+trap 'rm -f "$TMP_RESULT_FILE"' EXIT
 
-cp "$PROVISIONING_FILES_ROOT/roots.json" "$RESULT_FILE"
+cp "$PROVISIONING_FILES_ROOT/roots.json" "$TMP_RESULT_FILE"
 
-# make sure we have something to work with
-if [ -f "$RESULT_FILE" ]
+# make sure we have something to work with, then publish atomically
+if [ -f "$TMP_RESULT_FILE" ]
 then
+  mv -f "$TMP_RESULT_FILE" "$RESULT_FILE"
   echo "Created file $RESULT_FILE"
 else
   echo "ERROR, no result file $RESULT_FILE created!"

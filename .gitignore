@@ -1,3 +1,5 @@
+.idea/
+coverage
 .jenkins
 .githubignore
 .gitlab-ci.yaml

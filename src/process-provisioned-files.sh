@@ -35,11 +35,12 @@ else
   echo "Using PROVISIONING_FILES_ROOT as defined: $PROVISIONING_FILES_ROOT"
 fi
 
-"$TOOLS_PATH"/fetch-proviosining-container.sh
+"$TOOLS_PATH"/fetch-provisioning-container.sh
 
 if [ "$RESULT_DIR" = "" ]
 then
   echo "ERROR: RESULT_DIR not defined"
+  exit 1
 else
   echo "Using RESULT_DIR as defined: $RESULT_DIR"
 fi
@@ -59,12 +60,24 @@ if [ "$PROCESSORS_TSL_SMB_ENABLED" = "true" ]
 then
   "$PROCESSORS_PATH"/tsl-smb/transform.sh
 else
-  echo "tsl transformer is disabled. If you need it, enable it via PROCESSORS_TSL_SMB_ENABLED=true"
+  echo "tsl smb transformer is disabled. If you need it, enable it via PROCESSORS_TSL_SMB_ENABLED=true"
 fi
 echo "............................"
 echo "end of smb tsl transformer"
 echo "............................"
 
+echo "=============+==============="
+echo "start of ocsp tsl transformer"
+echo "==============+=============="
+if [ "$PROCESSORS_TSL_OCSP_ENABLED" = "true" ]
+then
+  "$PROCESSORS_PATH"/tsl-ocsp/transform.sh
+else
+  echo "tsl ocsp transformer is disabled. If you need it, enable it via PROCESSORS_TSL_OCSP_ENABLED=true"
+fi
+echo "............................"
+echo "end of ocsp tsl transformer"
+echo "............................"
 
 echo "============================"
 echo "start of tpm transformer"
@@ -108,3 +121,35 @@ echo "end of roots-json transformer"
 echo "............................"
 
 rm -rf "$PROVISIONING_FILES_ROOT"
+
+if [ -n "$SCHEDULE_TIME" ]
+then
+  case "$SCHEDULE_TIME" in
+    [01][0-9]:[0-5][0-9]|2[0-3]:[0-5][0-9]) ;;
+    *)
+      echo "ERROR: SCHEDULE_TIME must be in HH:MM format (e.g. 03:00), got: $SCHEDULE_TIME"
+      exit 1
+      ;;
+  esac
+
+  echo "SCHEDULE_TIME=$SCHEDULE_TIME: staying resident, re-running daily at that time"
+  while true
+  do
+    TODAY=$(date +%Y-%m-%d)
+    NOW_EPOCH=$(date +%s)
+    NEXT_EPOCH=$(date -d "$TODAY $SCHEDULE_TIME" +%s)
+    if [ "$NEXT_EPOCH" -le "$NOW_EPOCH" ]
+    then
+      TOMORROW=$(date -d "@$(( NOW_EPOCH + 86400 ))" +%Y-%m-%d)
+      NEXT_EPOCH=$(date -d "$TOMORROW $SCHEDULE_TIME" +%s)
+    fi
+    SLEEP_SECONDS=$(( NEXT_EPOCH - NOW_EPOCH ))
+    echo "Next provisioning run at $(date -d "@$NEXT_EPOCH"), sleeping ${SLEEP_SECONDS}s"
+    sleep "$SLEEP_SECONDS"
+
+    echo "Re-running scheduled provisioning cycle"
+    if ! SCHEDULE_TIME="" "$0"; then
+      echo "WARNING: scheduled provisioning run failed, will retry at next scheduled time"
+    fi
+  done
+fi

@@ -1,0 +1,27 @@
+ARG DOCKER_HUB="docker.io"
+
+FROM ${DOCKER_HUB}/alpine:3.23.3
+
+RUN apk add --no-cache \
+    bash \
+    cabextract \
+    cosign \
+    jq \
+    libxslt \
+    openssl \
+    ruby
+
+RUN gem install bashcov --no-document
+
+ENV TOOLS_PATH=/opt/provisioning-tools
+ENV PROCESSORS_PATH="$TOOLS_PATH/processors"
+
+COPY --chown=1000:1000 src $TOOLS_PATH
+COPY --chown=1000:1000 .simplecov $TOOLS_PATH/.simplecov
+COPY --chown=1000:1000 test /test
+
+RUN chmod +x /test/run-coverage.sh
+
+USER 1000
+
+ENTRYPOINT [ "/test/run-coverage.sh" ]
