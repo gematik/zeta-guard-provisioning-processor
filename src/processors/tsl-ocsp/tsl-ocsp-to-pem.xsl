@@ -43,19 +43,11 @@
                               /tsl:TrustServiceProvider
                               /tsl:TSPServices
                               /tsl:TSPService[
-                                  (
-                                      tsl:ServiceInformation/tsl:ServiceStatus = 'http://uri.etsi.org/TrstSvc/Svcstatus/inaccord'
-                                      or
-                                      tsl:ServiceInformation/tsl:ServiceStatus = 'http://uri.etsi.org/TrstSvc/Svcstatus/revoked'
-                                  )
+                                  tsl:ServiceInformation
+                                  /tsl:ServiceTypeIdentifier = 'http://uri.etsi.org/TrstSvc/Svctype/Certstatus/OCSP'
                                   and
                                   tsl:ServiceInformation
-                                  /tsl:ServiceInformationExtensions
-                                  /tsl:Extension[
-                                      tsl:ExtensionOID = '1.2.276.0.76.4.77'
-                                      and
-                                      tsl:ExtensionValue = 'oid_smc_b_aut'
-                                  ]
+                                  /tsl:ServiceStatus = 'http://uri.etsi.org/TrstSvc/Svcstatus/inaccord'
                               ]">
             <xsl:text>friendlyName=</xsl:text>
             <xsl:call-template name="sanitize-name">

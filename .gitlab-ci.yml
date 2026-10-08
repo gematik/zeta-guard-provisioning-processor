@@ -1,11 +1,3 @@
-spec:
-  inputs:
-    sonar-quality-gate-enabled:
-      description: 'Enables SonarQube [Quality Gate](https://docs.sonarsource.com/sonarqube-server/latest/quality-standards-administration/managing-quality-gates/introduction/) verification.'
-      type: boolean
-      default: false
-
----
 # prevent duplicate pipelines
 # https://docs.gitlab.com/ci/jobs/job_rules/#avoid-duplicate-pipelines
 # https://docs.gitlab.com/ci/yaml/workflow/#switch-between-branch-pipelines-and-merge-request-pipelines
@@ -20,10 +12,22 @@ workflow:
 stages:
   - build
   - test
-#  - deploy
   - publish
+  - sign
+  - deploy
 
 include:
+  - component: "$CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-scanning@v0.4.2"
+    inputs:
+      analyzer-image: "$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/aquasec/trivy:0.69.3@sha256:7228e304ae0f610a1fad937baa463598cadac0c2ac4027cc68f3a8b997115689"
+      cs-image: "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+      git-strategy: fetch
+      severity: HIGH,CRITICAL
+      job-stage: test
+      openvex-file: ".vex/vulnerabilites.openvex.json"
+    rules:
+      - if: $CI_COMMIT_TAG
+
   - component: "$CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-scanning@v0.4.2"
     inputs:
       analyzer-image: "$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/aquasec/trivy:0.69.3@sha256:7228e304ae0f610a1fad937baa463598cadac0c2ac4027cc68f3a8b997115689"
@@ -31,7 +35,19 @@ include:
       git-strategy: fetch
       severity: HIGH,CRITICAL
       job-stage: test
-      openvex-file: "vulnerabilites.openvex.json"
+      openvex-file: ".vex/vulnerabilites.openvex.json"
+    rules:
+      - if: $CI_COMMIT_TAG
+        when: never
+      - if: '$CI_PIPELINE_SOURCE != "schedule"'
+
+  - component: $CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-signing@v1.2.0
+    inputs:
+      image-to-sign: "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
+      job-dependencies: [ build ]
+      job-stage: sign
+    rules:
+      - if: $CI_COMMIT_TAG
 
 default:
   image: $CI_REGISTRY/zeta/devops/ci-images/docker:24.0.5-zeta-0
@@ -41,6 +57,9 @@ default:
       alias: docker
       variables:
         HEALTHCHECK_TCP_PORT: "2376"
+  before_script:
+    - printf "%s" "$CI_DEPENDENCY_PROXY_PASSWORD" | docker login "$CI_DEPENDENCY_PROXY_SERVER" -u "$CI_DEPENDENCY_PROXY_USER" --password-stdin
+    - printf "%s" "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
 
 variables:
   DOCKER_BUILDKIT: "1"
@@ -49,68 +68,116 @@ variables:
   DOCKER_TLS_CERTDIR: /certs
   DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
   DOCKER_TLS_VERIFY: "1"
-  BASE_IMAGE: "$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/nginxinc/nginx-unprivileged:$NGINX_VERSION-trixie-otel"
   IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
-
-before_script:
-  - docker context create docker
-  - docker buildx create --name ci-builder --use --driver docker-container --driver-opt image="$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/moby/buildkit:buildx-stable-1" docker
-  - docker buildx use ci-builder
-  - printf "%s" "$CI_DEPENDENCY_PROXY_PASSWORD" | docker login "$CI_DEPENDENCY_PROXY_SERVER" -u "$CI_DEPENDENCY_PROXY_USER" --password-stdin
-  - printf "%s" "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
 
 build:
   stage: build
   rules:
+    - if: $CI_COMMIT_TAG
+      variables:
+        IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
     # don't rebuild for nightly build, keep scanning the last-built image
     - if: '$CI_PIPELINE_SOURCE != "schedule"'
       when: always
   script:
+    - docker context create docker
+    # register QEMU emulators so the amd64 runner can also build arm64
+    - docker run --privileged --rm "$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/tonistiigi/binfmt" --install all
+    - |
+      docker buildx create \
+        --driver docker-container \
+        --driver-opt image="$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/moby/buildkit:buildx-stable-1" \
+        --name ci-builder \
+        --use \
+        docker
     - |
       docker buildx build \
+        --platform linux/amd64,linux/arm64 \
+        --provenance=false \
         --build-arg BUILDKIT_SYNTAX="$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX"/docker/dockerfile:1.7 \
-        --cache-from type=registry,ref="$CI_REGISTRY_IMAGE:buildcache" \
-        --cache-to type=registry,ref="$CI_REGISTRY_IMAGE:buildcache,mode=max,compression=zstd" \
+        --build-arg DOCKER_HUB="$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX" \
+        --cache-from type=registry,ref="$CI_REGISTRY_IMAGE/cache:buildcache" \
+        --cache-to type=registry,ref="$CI_REGISTRY_IMAGE/cache:buildcache,mode=max,compression=zstd" \
         --tag "$IMAGE" \
         --push \
         "$@" \
         .
 
-#trigger_helm:
-#  stage: deploy
-#  rules:
-#    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-#      when: never
-#    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-#      when: on_success
-#    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-#      when: on_success
-#    - when: never
-#  trigger:
-#    project: zeta/devops/zeta-guard-helm
-#    branch: main
-#    strategy: depend
-#  variables:
-#    PROVISIONING_PROCESSOR_IMAGE_TAG: "$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA" # e.g. main-cafebabe
-
-tag_main:
-  stage: publish
+test:
+  stage: test
   rules:
-    # don't trigger for nightly builds — they are supposed to check dependency issues in
-    # *previously* built and released images, and not build/tag anything themselves.
-    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      when: on_success
-    - when: never
+    - when: on_success
   needs:
     - job: build
-      optional: true # resolved before rules are evaluated, which fails when schedule
-#    - job: trigger_helm
-#      optional: true
   script:
+    - docker context create docker
     - |
-      export NEW_IMAGE="$CI_REGISTRY_IMAGE:$CI_DEFAULT_BRANCH"
-      docker pull "$IMAGE"
-      docker tag "$IMAGE" "$NEW_IMAGE"
-      docker push "$NEW_IMAGE"
+      docker buildx create \
+        --driver docker-container \
+        --driver-opt image="$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/moby/buildkit:buildx-stable-1" \
+        --name ci-builder \
+        --use \
+        docker
+    - |
+      docker buildx build \
+        --build-arg DOCKER_HUB="$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX" \
+        --tag provisioning-processor-coverage:test \
+        --file Dockerfile.test \
+        --load \
+        .
+    - mkdir -p coverage
+    - docker create --name coverage-extract provisioning-processor-coverage:test
+    - docker start -a coverage-extract; TEST_EXIT=$?
+    - docker cp coverage-extract:/opt/provisioning-tools/coverage/. coverage/
+    - docker rm coverage-extract
+    - exit $TEST_EXIT
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+
+# retag the immutable build image (main-<sha>) as the floating :main tag the Helm chart consumes
+retag:
+  stage: publish
+  needs:
+    - job: build
+  variables:
+    TARGET_TAG: "$CI_DEFAULT_BRANCH"
+    BUILDX_BUILDER: "" # the global ci-builder only exists in the build job
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+    - when: never
+  script:
+    # copies the whole manifest list server-side; docker pull/tag/push would collapse the
+    # multi-arch index to the runner's architecture
+    - docker buildx imagetools create --tag "$CI_REGISTRY_IMAGE:$TARGET_TAG" "$IMAGE"
+
+trigger_helm:
+  stage: deploy
+  needs:
+    - job: build
+    - job: retag
+      optional: true # only present on the default branch
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        PROVISIONING_PROCESSOR_IMAGE_TAG: "$CI_COMMIT_REF_SLUG" # floating :main from retag
+      when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      variables:
+        PROVISIONING_PROCESSOR_IMAGE_TAG: "$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA" # exact image from build
+      when: on_success
+    - when: never
+  trigger:
+    project: zeta/devops/zeta-guard-helm
+    branch: main
+    strategy: depend

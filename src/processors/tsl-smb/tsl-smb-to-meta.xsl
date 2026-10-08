@@ -31,14 +31,15 @@
 
     <xsl:output method="text" encoding="UTF-8"/>
 
-    <!-- Strip ", ', and \ from a name value -->
+    <!-- Strip ", ', and \ from a string before embedding it in JSON -->
     <xsl:template name="sanitize-name">
         <xsl:param name="s"/>
         <xsl:value-of select="translate($s, concat('&quot;\', &quot;'&quot;), '')"/>
     </xsl:template>
 
     <xsl:template match="/">
-        <xsl:for-each select="tsl:TrustServiceStatusList
+        <xsl:text>[</xsl:text>
+        <xsl:variable name="services" select="tsl:TrustServiceStatusList
                               /tsl:TrustServiceProviderList
                               /tsl:TrustServiceProvider
                               /tsl:TSPServices
@@ -56,18 +57,29 @@
                                       and
                                       tsl:ExtensionValue = 'oid_smc_b_aut'
                                   ]
-                              ]">
-            <xsl:text>friendlyName=</xsl:text>
+                              ]"/>
+        <xsl:for-each select="$services">
+            <xsl:text>&#10;  {</xsl:text>
+            <xsl:text>&#10;    "friendlyName": "</xsl:text>
             <xsl:call-template name="sanitize-name">
                 <xsl:with-param name="s" select="tsl:ServiceInformation/tsl:ServiceName/tsl:Name"/>
             </xsl:call-template>
-            <xsl:text>&#10;</xsl:text>
-            <xsl:text>-----BEGIN CERTIFICATE-----&#10;</xsl:text>
-            <xsl:value-of select="tsl:ServiceInformation
-                              /tsl:ServiceDigitalIdentity
-                              /tsl:DigitalId
-                              /tsl:X509Certificate"/>
-            <xsl:text>&#10;-----END CERTIFICATE-----&#10;</xsl:text>
+            <xsl:text>",</xsl:text>
+            <xsl:text>&#10;    "tspName": "</xsl:text>
+            <xsl:call-template name="sanitize-name">
+                <xsl:with-param name="s" select="../../tsl:TSPInformation/tsl:TSPTradeName/tsl:Name"/>
+            </xsl:call-template>
+            <xsl:text>"</xsl:text>
+            <xsl:if test="tsl:ServiceInformation/tsl:ServiceStatus = 'http://uri.etsi.org/TrstSvc/Svcstatus/revoked'">
+                <xsl:text>,&#10;    "revokedSince": "</xsl:text>
+                <xsl:value-of select="tsl:ServiceInformation/tsl:StatusStartingTime"/>
+                <xsl:text>"</xsl:text>
+            </xsl:if>
+            <xsl:text>&#10;  }</xsl:text>
+            <xsl:if test="position() != last()">
+                <xsl:text>,</xsl:text>
+            </xsl:if>
         </xsl:for-each>
+        <xsl:text>&#10;]&#10;</xsl:text>
     </xsl:template>
 </xsl:stylesheet>

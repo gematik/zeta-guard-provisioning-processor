@@ -1,0 +1,31 @@
+#!/bin/bash
+echo "cosign $*" >> "$STUB_LOG"
+
+if [ "$1" = "$COSIGN_STUB_FAIL_ON" ]; then
+  exit 1
+fi
+
+if [ "$1" = "save" ]; then
+  DIR=""
+  for arg in "$@"; do
+    if [ "$PREV" = "--dir" ]; then DIR="$arg"; fi
+    PREV="$arg"
+  done
+  if [ -n "$DIR" ]; then
+    mkdir -p "$DIR/blobs/sha256"
+
+    LAYER_COUNT="${COSIGN_STUB_LAYER_COUNT:-1}"
+    DIGESTS=""
+    for i in $(seq 1 "$LAYER_COUNT"); do
+      LAYER_CONTENT_DIR=$(mktemp -d)
+      echo "layer-${i}-content" > "$LAYER_CONTENT_DIR/layer-${i}.txt"
+      tar -czf "$DIR/blobs/sha256/layer${i}" -C "$LAYER_CONTENT_DIR" .
+      rm -rf "$LAYER_CONTENT_DIR"
+      DIGESTS="${DIGESTS}{\"digest\":\"sha256:layer${i}\"},"
+    done
+    DIGESTS="${DIGESTS%,}"
+
+    printf '{"layers":[%s]}' "$DIGESTS" > "$DIR/blobs/sha256/bbb222"
+    printf '{"manifests":[{"digest":"sha256:bbb222","annotations":{"kind":"dev.cosignproject.cosign/image"}}]}' > "$DIR/index.json"
+  fi
+fi

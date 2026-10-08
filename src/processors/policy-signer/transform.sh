@@ -39,12 +39,15 @@ then
 fi
 
 RESULT_FILE="$RESULT_DIR/$POLICY_RESULT_FILENAME"
+TMP_RESULT_FILE="$RESULT_DIR/.$POLICY_RESULT_FILENAME.tmp.$$"
+trap 'rm -f "$TMP_RESULT_FILE"' EXIT
 
-openssl x509 -in "$POLICY_SIGNER_CERT_FILENAME" -pubkey -noout -out "$RESULT_FILE"
+openssl x509 -in "$POLICY_SIGNER_CERT_FILENAME" -pubkey -noout -out "$TMP_RESULT_FILE"
 
-# make sure we have something to work with
-if [ -f "$RESULT_FILE" ]
+# make sure we have something to work with, then publish atomically
+if [ -f "$TMP_RESULT_FILE" ]
 then
+  mv -f "$TMP_RESULT_FILE" "$RESULT_FILE"
   echo "Created file $RESULT_FILE"
 else
   echo "ERROR, no result file $RESULT_FILE created!"

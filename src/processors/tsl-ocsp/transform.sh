@@ -25,8 +25,8 @@
 #  */
 #
 
-TSL_PROC_PATH="$PROCESSORS_PATH/tsl-smb"
-RESULT_FILE="$RESULT_DIR/smcb-trust-roots.p12"
+TSL_PROC_PATH="$PROCESSORS_PATH/tsl-ocsp"
+RESULT_FILE="$RESULT_DIR/ocsp-signers.p12"
 
 if [ "$TSL_FILENAME" = "" ]
 then
@@ -34,31 +34,31 @@ then
   echo "TSL_FILENAME not defined, using  default $TSL_FILENAME"
 fi
 
-if [ "$SMB_RESULT_FILENAME" = "" ]
+if [ "$OCSP_RESULT_FILENAME" = "" ]
 then
-  export SMB_RESULT_FILENAME="smcb-trust-roots.p12"
-  echo "SMB_RESULT_FILENAME not defined, using  default $SMB_RESULT_FILENAME"
+  export OCSP_RESULT_FILENAME="ocsp-signers.p12"
+  echo "OCSP_RESULT_FILENAME not defined, using  default $OCSP_RESULT_FILENAME"
 fi
 
-if [ "$SMB_META_FILENAME" = "" ]
+if [ "$OCSP_META_FILENAME" = "" ]
 then
-  export SMB_META_FILENAME="smcb-trust-roots-meta.json"
-  echo "SMB_META_FILENAME not defined, using default $SMB_META_FILENAME"
+  export OCSP_META_FILENAME="ocsp-signers-meta.json"
+  echo "OCSP_META_FILENAME not defined, using default $OCSP_META_FILENAME"
 fi
 
-RESULT_FILE="$RESULT_DIR/$SMB_RESULT_FILENAME"
-META_FILE="$RESULT_DIR/$SMB_META_FILENAME"
-TMP_RESULT_FILE="$RESULT_DIR/.$SMB_RESULT_FILENAME.tmp.$$"
-TMP_META_FILE="$RESULT_DIR/.$SMB_META_FILENAME.tmp.$$"
+RESULT_FILE="$RESULT_DIR/$OCSP_RESULT_FILENAME"
+META_FILE="$RESULT_DIR/$OCSP_META_FILENAME"
+TMP_RESULT_FILE="$RESULT_DIR/.$OCSP_RESULT_FILENAME.tmp.$$"
+TMP_META_FILE="$RESULT_DIR/.$OCSP_META_FILENAME.tmp.$$"
 trap 'rm -f "$TMP_RESULT_FILE" "$TMP_META_FILE"' EXIT
 
 WORKDIR=$(mktemp -d)
 
 # extract SMB certs as PEM and their friendlyNames from the TSL
-xsltproc "$TSL_PROC_PATH/tsl-smb-to-pem.xsl" "$PROVISIONING_FILES_ROOT/$TSL_FILENAME" > "$WORKDIR/certsFromTsl.xpem"
+xsltproc "$TSL_PROC_PATH/tsl-ocsp-to-pem.xsl" "$PROVISIONING_FILES_ROOT/$TSL_FILENAME" > "$WORKDIR/certsFromTsl.xpem"
 
-# extract metadata (TSPTradeName, revocationTime) as JSON
-xsltproc "$TSL_PROC_PATH/tsl-smb-to-meta.xsl" "$PROVISIONING_FILES_ROOT/$TSL_FILENAME" > "$TMP_META_FILE"
+# extract metadata (TSPTradeName) as JSON
+xsltproc "$TSL_PROC_PATH/tsl-ocsp-to-meta.xsl" "$PROVISIONING_FILES_ROOT/$TSL_FILENAME" > "$TMP_META_FILE"
 
 # extract names (quote-stripping is handled in the XSLT)
 grep 'friendlyName=' "$WORKDIR/certsFromTsl.xpem" | cut -c14- > "$WORKDIR/friendlyNames"
@@ -93,4 +93,3 @@ else
   echo "ERROR, no metadata file $META_FILE created!"
   exit 1
 fi
-

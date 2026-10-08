@@ -24,6 +24,7 @@
 #  * #L%
 #  */
 #
+set -e
 
 if [ "$TPM_CAB_FILENAME" = "" ]
 then
@@ -38,6 +39,8 @@ then
 fi
 
 RESULT_FILE="$RESULT_DIR/$TPM_RESULT_FILENAME"
+TMP_RESULT_FILE="$RESULT_DIR/.$TPM_RESULT_FILENAME.tmp.$$"
+trap 'rm -f "$TMP_RESULT_FILE"' EXIT
 
 CABDIR=$(mktemp -d)
 cabextract -q -d "$CABDIR" "$PROVISIONING_FILES_ROOT/$TPM_CAB_FILENAME"
@@ -50,7 +53,6 @@ touch "$TEMP_PEM_FILE"
 
 echo "Wrapping the certs up into a temporary PEM file."
 echo "Expecting this to fail for the following files, because they have defective ASN1 encoding. But there is a fixed certificate file for each one of these:"
-# that's also a reason why we don't have "set -e" for this file
 echo "STMicro/IntermediateCA/STM TPM ECC Intermediate CA 01.crt with a fixed certificate in STMicro/IntermediateCA/STM TPM ECC Intermediate CA 01_2.crt"
 echo "STMicro/IntermediateCA/STM TPM EK Intermediate CA 01.crt with a fixed certificate in STMicro/IntermediateCA/STM TPM EK Intermediate CA 01_2.crt"
 echo "STMicro/IntermediateCA/STM TPM EK Intermediate CA 02.crt with a fixed certificate in STMicro/IntermediateCA/STM TPM EK Intermediate CA 02_2.crt"
@@ -71,19 +73,20 @@ done < <(grep -RIl "BEGIN CERTIFICATE" "$CABDIR" | grep -E '\.(der|cer|crt)$')
 # read all DER encoded certs and cat them as pem into the temp pem file
 while IFS= read -r DER_CERT
 do
-  openssl x509 -inform DER -in "$DER_CERT" >> "$TEMP_PEM_FILE"
+  openssl x509 -inform DER -in "$DER_CERT" >> "$TEMP_PEM_FILE" || true
 done < <(grep -RL "BEGIN CERTIFICATE" "$CABDIR" | grep -E '\.(der|cer|crt)$')
 
 # reencode the temp pem file into a pkcs12 truststore
-openssl pkcs12 -in "$TEMP_PEM_FILE" -passout "pass:$TRUSTSTORE_PASS" -nokeys -export -out "$RESULT_FILE"
+openssl pkcs12 -in "$TEMP_PEM_FILE" -passout "pass:$TRUSTSTORE_PASS" -nokeys -export -out "$TMP_RESULT_FILE" || true
 
 # time for cleanup
 rm -rf "$CABDIR"
 rm -rf "$WORKDIR"
 
-# make sure we have something to work with
-if [ -f "$RESULT_FILE" ]
+# make sure we have something to work with, then publish atomically
+if [ -f "$TMP_RESULT_FILE" ]
 then
+  mv -f "$TMP_RESULT_FILE" "$RESULT_FILE"
   echo "Created file $RESULT_FILE"
 else
   echo "ERROR, no result file $RESULT_FILE created!"
