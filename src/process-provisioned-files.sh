@@ -80,16 +80,42 @@ echo "end of ocsp tsl transformer"
 echo "............................"
 
 echo "============================"
-echo "start of tpm transformer"
+echo "ℹ️ Start of TPM transformer"
 echo "============================"
 if [ "$PROCESSORS_TPM_ENABLED" = "true" ]
 then
   "$PROCESSORS_PATH"/tpm/transform.sh
 else
-  echo "tpm transformer is disabled. If you need it, enable it via PROCESSORS_TPM_ENABLED=true"
+  echo "⚠️ TPM transformer is disabled. If you need it, enable it via PROCESSORS_TPM_ENABLED=true"
 fi
 echo "............................"
-echo "end of tpm transformer"
+echo "👋 End of TPM transformer"
+echo "............................"
+
+echo "============================"
+echo "ℹ️ Start of Apple transformer"
+echo "============================"
+if [ "$PROCESSORS_APPLE_TRUST_STORE_ENABLED" = "true" ]
+then
+  "$PROCESSORS_PATH"/apple/transform.sh
+else
+  echo "⚠️ Apple transformer is disabled. If you need it, enable it via PROCESSORS_APPLE_TRUST_STORE_ENABLED=true"
+fi
+echo "............................"
+echo "👋 End of Apple transformer"
+echo "............................"
+
+echo "============================"
+echo "ℹ️ Start of Google transformer"
+echo "============================"
+if [ "$PROCESSORS_GOOGLE_TRUST_STORE_ENABLED" = "true" ]
+then
+  "$PROCESSORS_PATH"/android/transform.sh
+else
+  echo "⚠️ Google transformer is disabled. If you need it, enable it via PROCESSORS_GOOGLE_TRUST_STORE_ENABLED=true"
+fi
+echo "............................"
+echo "👋 End of Google transformer"
 echo "............................"
 
 
@@ -118,6 +144,20 @@ else
 fi
 echo "............................"
 echo "end of roots-json transformer"
+echo "............................"
+
+
+echo "============================"
+echo "start of federation-master transformer"
+echo "============================"
+if [ "$PROCESSORS_FEDERATION_MASTER_ENABLED" = "true" ]
+then
+  "$PROCESSORS_PATH"/federation-master/transform.sh
+else
+  echo "federation-master transformer is disabled. If you need it, enable it via PROCESSORS_FEDERATION_MASTER_ENABLED=true"
+fi
+echo "............................"
+echo "end of federation-master transformer"
 echo "............................"
 
 rm -rf "$PROVISIONING_FILES_ROOT"

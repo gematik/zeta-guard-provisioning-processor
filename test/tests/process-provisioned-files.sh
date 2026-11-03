@@ -48,7 +48,7 @@ test_all_disabled() {
     || { fail "all disabled: no smb disabled message"; teardown; return; }
   echo "$OUTPUT" | grep -q "tsl ocsp transformer is disabled" \
     || { fail "all disabled: no ocsp disabled message"; teardown; return; }
-  echo "$OUTPUT" | grep -q "tpm transformer is disabled" \
+  echo "$OUTPUT" | grep -q "TPM transformer is disabled" \
     || { fail "all disabled: no tpm disabled message"; teardown; return; }
   echo "$OUTPUT" | grep -q "policy-signer transformer is disabled" \
     || { fail "all disabled: no policy-signer disabled message"; teardown; return; }

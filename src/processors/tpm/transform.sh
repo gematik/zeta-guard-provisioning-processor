@@ -29,13 +29,13 @@ set -e
 if [ "$TPM_CAB_FILENAME" = "" ]
 then
   export TPM_CAB_FILENAME="TrustedTpm.cab"
-  echo "TPM_CAB_FILENAME not defined, using  default $TPM_CAB_FILENAME"
+  echo "TPM_CAB_FILENAME not defined, using default $TPM_CAB_FILENAME"
 fi
 
 if [ "$TPM_RESULT_FILENAME" = "" ]
 then
   export TPM_RESULT_FILENAME="tpm-trust-roots.p12"
-  echo "TPM_RESULT_FILENAME not defined, using  default $TPM_RESULT_FILENAME"
+  echo "TPM_RESULT_FILENAME not defined, using default $TPM_RESULT_FILENAME"
 fi
 
 RESULT_FILE="$RESULT_DIR/$TPM_RESULT_FILENAME"
@@ -77,7 +77,7 @@ do
 done < <(grep -RL "BEGIN CERTIFICATE" "$CABDIR" | grep -E '\.(der|cer|crt)$')
 
 # reencode the temp pem file into a pkcs12 truststore
-openssl pkcs12 -in "$TEMP_PEM_FILE" -passout "pass:$TRUSTSTORE_PASS" -nokeys -export -out "$TMP_RESULT_FILE" || true
+openssl pkcs12 -in "$TEMP_PEM_FILE" -passout "pass:$TRUSTSTORE_PASS" -jdktrust anyExtendedKeyUsage -caname TPM -nokeys -export -out "$TMP_RESULT_FILE" || true
 
 # time for cleanup
 rm -rf "$CABDIR"

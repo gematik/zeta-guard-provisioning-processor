@@ -2,6 +2,20 @@
 
 # ZETA Guard Provisioning Processor
 
+## Release 2.0.0
+
+### added:
+
+- Processor for FederationMasterUrl
+- Processor for Apple attestation roots.
+- Processor for Android attestation roots.
+
+### fixed:
+
+- SMC-B, TPM and Apple trust stores are written with `-jdktrust anyExtendedKeyUsage` and a CA
+  name per certificate, so Java reads them as trusted certificate entries.
+
+
 ## Release 1.3.2
 
 ### fixed:

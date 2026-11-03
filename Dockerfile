@@ -4,13 +4,15 @@ FROM ${DOCKER_HUB}/alpine:3.23.3
 
 RUN apk add \
     bash \
+    curl \
     cabextract \
     cosign \
     jq \
     kubectl \
     libxslt \
     openssl \
-    tzdata
+    tzdata \
+    yq
 
 ENV TOOLS_PATH=/opt/provisioning-tools
 ENV PROCESSORS_PATH="$TOOLS_PATH/processors"

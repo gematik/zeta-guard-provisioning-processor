@@ -17,29 +17,6 @@ stages:
   - deploy
 
 include:
-  - component: "$CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-scanning@v0.4.2"
-    inputs:
-      analyzer-image: "$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/aquasec/trivy:0.69.3@sha256:7228e304ae0f610a1fad937baa463598cadac0c2ac4027cc68f3a8b997115689"
-      cs-image: "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
-      git-strategy: fetch
-      severity: HIGH,CRITICAL
-      job-stage: test
-      openvex-file: ".vex/vulnerabilites.openvex.json"
-    rules:
-      - if: $CI_COMMIT_TAG
-
-  - component: "$CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-scanning@v0.4.2"
-    inputs:
-      analyzer-image: "$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/aquasec/trivy:0.69.3@sha256:7228e304ae0f610a1fad937baa463598cadac0c2ac4027cc68f3a8b997115689"
-      cs-image: "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
-      git-strategy: fetch
-      severity: HIGH,CRITICAL
-      job-stage: test
-      openvex-file: ".vex/vulnerabilites.openvex.json"
-    rules:
-      - if: $CI_COMMIT_TAG
-        when: never
-      - if: '$CI_PIPELINE_SOURCE != "schedule"'
 
   - component: $CI_SERVER_FQDN/zeta/zeta-ci-cd-components/container-signing@v1.2.0
     inputs:
@@ -76,9 +53,7 @@ build:
     - if: $CI_COMMIT_TAG
       variables:
         IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG"
-    # don't rebuild for nightly build, keep scanning the last-built image
-    - if: '$CI_PIPELINE_SOURCE != "schedule"'
-      when: always
+    - when: always
   script:
     - docker context create docker
     # register QEMU emulators so the amd64 runner can also build arm64
@@ -106,8 +81,6 @@ build:
 test:
   stage: test
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: never
     - when: on_success
   needs:
     - job: build
@@ -138,6 +111,39 @@ test:
     paths:
       - coverage/
 
+sonarqube:
+  stage: test
+  before_script: []
+  services: []
+  image:
+    name: "$CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX/sonarsource/sonar-scanner-cli:latest"
+    entrypoint: [""]
+  cache:
+    - key: "${CI_JOB_NAME}"
+      paths:
+        - "${CI_PROJECT_DIR}/.sonar/cache"
+  needs:
+    - job: test
+      artifacts: true
+  script:
+    - >-
+      sonar-scanner
+      ${TRACE+-Dsonar.verbose=true}
+      ${SONAR_QUALITY_GATE_ENABLED:+-Dsonar.qualitygate.wait=$SONAR_QUALITY_GATE_ENABLED}
+      -Dsonar.projectVersion="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+      -Dsonar.links.homepage=${CI_PROJECT_URL}
+      -Dsonar.links.ci=${CI_PROJECT_URL}/-/pipelines
+      -Dsonar.links.issue=${CI_PROJECT_URL}/-/issues
+  rules:
+    - if: '($SONAR_HOST_URL == null || $SONAR_HOST_URL == "")'
+      when: never
+    - when: on_success
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+    GIT_DEPTH: "0"
+    # SONAR_QUALITY_GATE_ENABLED: "true"
+    # TRACE: "1"
+
 # retag the immutable build image (main-<sha>) as the floating :main tag the Helm chart consumes
 retag:
   stage: publish
@@ -147,8 +153,6 @@ retag:
     TARGET_TAG: "$CI_DEFAULT_BRANCH"
     BUILDX_BUILDER: "" # the global ci-builder only exists in the build job
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
     - when: never
@@ -164,8 +168,6 @@ trigger_helm:
     - job: retag
       optional: true # only present on the default branch
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: never
     - if: $CI_COMMIT_TAG
       when: never
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
