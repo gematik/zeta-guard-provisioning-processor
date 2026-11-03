@@ -65,11 +65,13 @@ grep 'friendlyName=' "$WORKDIR/certsFromTsl.xpem" | cut -c14- > "$WORKDIR/friend
 
 # setting the friendlyName can only be done via a cmd parameter for each cert. So we need to construct the openssl
 # command based on the input
-COMMAND="openssl pkcs12 -in \"$WORKDIR/certsFromTsl.xpem\" -passout \"pass:$TRUSTSTORE_PASS\" -nokeys -export -out \"$TMP_RESULT_FILE\""
+NAMES=""
 while read -r CANAME; do
-  COMMAND="$COMMAND -caname \"$CANAME\""
+  NAMES="$NAMES -caname \"$CANAME\""
 done < "$WORKDIR/friendlyNames"
 
+COMMAND="openssl pkcs12 -in \"$WORKDIR/certsFromTsl.xpem\" -jdktrust anyExtendedKeyUsage $NAMES -passout \"pass:$TRUSTSTORE_PASS\" -nokeys -export -out \"$TMP_RESULT_FILE\""
+echo "🛠️ Executing $COMMAND"
 eval "$COMMAND"
 
 # time for cleanup

@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# /*-
+#  * #%L
+#  * provisioning-processor
+#  * %%
+#  * (C) tech@Spree GmbH, 2026, licensed for gematik GmbH
+#  * %%
+#  * Licensed under the Apache License, Version 2.0 (the "License");
+#  * you may not use this file except in compliance with the License.
+#  * You may obtain a copy of the License at
+#  *
+#  *     http://www.apache.org/licenses/LICENSE-2.0
+#  *
+#  * Unless required by applicable law or agreed to in writing, software
+#  * distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#  *
+#  * *******
+#  *
+#  * For additional notes and disclaimer from gematik and in case of changes by gematik find details in the "Readme" file.
+#  * #L%
+#  */
+#
+CA_ROOT="apple-root-ca"
+
+if [ "$APPLE_ROOT_CERT_FILENAME" = "" ]
+then
+  APPLE_ROOT_CERT_FILENAME="$PROVISIONING_FILES_ROOT/apple-roots/apple-root.pem"
+  export APPLE_ROOT_CERT_FILENAME
+  echo "ℹ️ APPLE_ROOT_CERT_FILENAME not defined, using default $APPLE_ROOT_CERT_FILENAME"
+fi
+
+if [ ! -f "$APPLE_ROOT_CERT_FILENAME" ]
+then
+  echo "💣 ERROR: $APPLE_ROOT_CERT_FILENAME does not exist"
+  exit
+fi
+
+if [ "$APPLE_ROOT_RESULT_FILENAME" = "" ]
+then
+  export APPLE_ROOT_RESULT_FILENAME="apple-trust-roots.p12"
+  echo "ℹ️ APPLE_ROOT_RESULT_FILENAME not defined, using default $APPLE_ROOT_RESULT_FILENAME"
+fi
+
+RESULT_FILE="$RESULT_DIR/$APPLE_ROOT_RESULT_FILENAME"
+TMP_RESULT_FILE="$RESULT_DIR/$APPLE_ROOT_RESULT_FILENAME.tmp.$$"
+trap 'rm -f "$TMP_RESULT_FILE"' EXIT
+
+echo "🛠️ Creating PKCS12 trust store from $APPLE_ROOT_CERT_FILENAME"
+
+openssl pkcs12 -export -nokeys -in "$APPLE_ROOT_CERT_FILENAME" -jdktrust anyExtendedKeyUsage -caname "$CA_ROOT" -out "$TMP_RESULT_FILE" -password "pass:$TRUSTSTORE_PASS"
+
+# make sure we have something to work with, then publish atomically
+if [ -f "$TMP_RESULT_FILE" ]
+then
+  mv -f "$TMP_RESULT_FILE" "$RESULT_FILE"
+  echo "☑️ Created file $RESULT_FILE"
+else
+  echo "💣 ERROR, no result file $RESULT_FILE created!"
+  exit 1
+fi
+

@@ -38,6 +38,8 @@ Es gibt folgende processors:
     - legt eine Ergebnisdatei `tpm-trust-roots.p12` an
 - Policy Signer: Extrahiert die von der Policy Engine zu verwendenden Bundlesignaturschlüssel
 - Roots.json: Erzeugt die `roots.json`
+- Federation Master: Extrahiert die `fedmasterUrl` aus der Federation-Master-YAML und legt sie als JSON ab. Der Suffix `/.well-known/openid-federation` wird automatisch entfernt, da Keycloak ihn selbst anhängt.
+    - legt eine Ergebnisdatei `federation-master.json` an
 
 ### Umgebungsvariablen
 
@@ -66,6 +68,12 @@ Es gibt folgende processors:
 | Policy    | `POLICY_SIGNER_CERT_FILENAME`              | `find "$PROVISIONING_FILES_ROOT/policy-engine-bundle-keys/signers" -not -type d \| head -n 1)`      | Name des end entity Zertifikatsdatei des Policy Signer Zertifikats.                                                                                                                                                                              | Nein        |
 | Policy    | `POLICY_RESULT_FILENAME`                   | `policy-signer.pub`                                                                                 | Name der Datei mit dem Verarbeitungsergebnis des Policy processor (PEM encoded public key)                                                                                                                                                       | Nein        |
 | Policy    | `PROCESSORS_ROOTS_JSON_ENABLED`            |                                                                                                     | Falls das `roots.json` bereitgestellt werden soll, muss diese Variable `true` sein.                                                                                                                                                              | Nein        |
+| Fed.Master | `PROCESSORS_FEDERATION_MASTER_ENABLED`    |                                                                                                     | Falls die `fedmasterUrl` aus der Federation-Master-YAML extrahiert werden soll, muss diese Variable `true` sein.                                                                                                                                | Nein        |
+| Fed.Master | `FEDERATION_MASTER_ENVIRONMENT`           |                                                                                                     | Name des Environments in der YAML (z. B. `production`, `test`). Muss genau einem Eintrag entsprechen.                                                                                                                                           | Ja          |
+| Fed.Master | `FEDERATION_MASTER_FILENAME`              | `federation-master.yaml`                                                                            | Name der Federation-Master-YAML-Datei im Provisioning Container.                                                                                                                                                                                 | Nein        |
+| Fed.Master | `FEDERATION_MASTER_RESULT_FILENAME`       | `federation-master.json`                                                                            | Name der Ergebnisdatei.                                                                                                                                                                                                                          | Nein        |
+| Fed.Master | `DEV_MODE`                                |                                                                                                     | Wenn `true`, kann `FEDMASTER_URL` die URL aus der YAML überschreiben. Erlaubt auch `http://`-URLs.                                                                                                                                              | Nein        |
+| Fed.Master | `FEDMASTER_URL`                           |                                                                                                     | Override-URL für den Federation Master. Nur wirksam bei `DEV_MODE=true`.                                                                                                                                                                         | Nein        |
 
 ## Kompilieren
 

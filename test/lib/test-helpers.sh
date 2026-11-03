@@ -7,7 +7,7 @@
 # The sourcing script's $0 is used to compute TEST_DIR (expects tests/ subdir).
 
 TEST_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PROCESSORS_PATH="${PROCESSORS_PATH:-/opt/provisioning-tools/processors}"
+PROCESSORS_PATH="${PROCESSORS_PATH:-$TEST_DIR/../src/processors}"
 
 FAILED=0
 PASSED=0
